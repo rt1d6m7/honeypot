@@ -1,0 +1,288 @@
+{% extends 'analysis/base.html' %}
+
+{% block container %}
+    <div class="container-fluid">
+
+        <script type="text/javascript">
+            function updateDateTime(id) {
+                now = new Date();
+                localtime = now.toString();
+                utctime = now.toGMTString();
+                var t = "<strong>Local time:</strong> " + localtime + "<br>" + "<strong>UTC time:</strong> " + utctime;
+                document.getElementById(id).innerHTML = t;
+            }
+       </script>
+
+        <div class="row" id="pageHeader">
+            <div class="col-xl-12">
+                <h4 class="main-title float-left">Overview</h4>
+            </div>
+        </div>
+        <!-- end row -->
+
+        <div class="row">
+            <div class="col-xl-12">
+                <div id="alertDiv">
+
+                </div>
+            </div>
+            <div class="col-xs-12 col-md-6 col-lg-6 col-xl-3">
+                <div class="card-box noradius noborder bg-warning">
+                    <i class="fas fa-database fa-6x float-right text-white"></i>
+                    <h6 class="text-white text-uppercase m-b-20">Stored requests</h6>
+                    <h1 class="m-b-20 text-white counter">{{ data_stored_requests_count }}</h1>
+                    <span class="text-white">{{ data_requests_last_24h_count }} (last 24 hours)</span>
+                </div>
+            </div>
+
+            <div class="col-xs-12 col-md-6 col-lg-6 col-xl-3">
+                <div class="card-box noradius noborder bg-info">
+                    <i class="fas fa-user fa-6x float-right text-white"></i>
+                    <h6 class="text-white text-uppercase m-b-20">IP addresses</h6>
+                    <h1 class="m-b-20 text-white counter">{{ data_distinct_ip_count }}</h1>
+                    <span class="text-white">{{ data_distinct_data_ips_last_24h_count }} (last 24 hours)</span>
+                </div>
+            </div>
+
+            <script>
+                $(document).ready(function() {
+                        var url_string = window.location.href;
+                        var url = new URL(url_string);
+                        if (url.searchParams.get("token") === "verysecret") {
+                            console.log("muh");
+                            var t = '<div class="alert alert-danger alert-dismissible">Please change your token in the <code>config.py</code> file! Keeping it on default (<code>verysecret</code>) will endanger your honeypot installation.<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a></div>';
+                            document.getElementById("alertDiv").innerHTML = t;
+                        }
+
+                   });
+            </script>
+        </div>
+        <!-- end row -->
+
+        <div class="row">
+            <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 col-xl-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>
+                            <label>Requests (last <select id="xhours" class="form-control inl">
+                                                  <option value="4">4</option>
+                                                  <option value="6">6</option>
+                                                  <option value="12">12</option>
+                                                  <option value="24" selected="selected">24</option>
+                                                    </select> hours)
+                            </label>
+                        </h5>
+                        <span id="xhours-time"></span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="xhourschart"></canvas>
+                    </div>
+                </div><!-- end card-->
+                <script type="text/javascript">
+                    function drawXHoursChart() {
+                        updateDateTime("xhours-time");
+                        // Send request to API, delete old chart, draw new chart
+                        $.getJSON({
+                            url: "/api/analysis/chart/requests/hours/"+$("#xhours").val()+"?token={{ ANALYSIS_TOKEN }}",
+                            type: "GET",
+                            // If AJAX was successful add the values into the chart
+                            success: function(data) {
+                                var ctx = document.getElementById('xhourschart').getContext('2d');
+                                // Destroy old chart
+                                if(typeof xHoursChart !== "undefined") {
+                                    xHoursChart.destroy();
+                                }
+                                xHoursChart = new Chart(ctx, {
+                                    type: 'line',
+                                    data: {
+                                        labels: data['hours'],
+                                        datasets: [{
+                                            label: '# of requests',
+                                            data: data['requests'],
+                                            "fill":false,
+                                            borderColor: 'rgb(178,223,219)',
+                                            backgroundColor: 'rgb(178,223,219)'
+                                        }]
+                                    },
+                                    options: {
+                                        scales: {
+                                            yAxes: [{
+                                                ticks: {
+                                                beginAtZero: true,
+                                                //stepSize: 1
+                                                }
+                                            }]
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    $(document).ready(function() {
+                        // Draw chart once after page load
+                        var xHoursChart;
+                        drawXHoursChart();
+                        // Detect if a change to the dropdown is made
+                        $("#xhours").change(function() {
+                            drawXHoursChart();
+                       });
+                   });
+                </script>
+            </div>
+
+            <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 col-xl-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>Requests (last <select id="xdays" class="form-control inl">
+                                              <option value="7">7</option>
+                                              <option value="30">30</option>
+                                              <option value="60">60</option>
+                                              <option value="120">120</option>
+                                            </select> days)
+                        </h5>
+                        <span id="xdays-time"></span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="xdayschart"></canvas>
+                    </div>
+                </div><!-- end card-->
+
+                <script type="text/javascript">
+                    function drawXDayChart() {
+                        updateDateTime("xdays-time");
+                        // Send request to API, delete old chart, draw new chart
+                        $.getJSON({
+                            url: "/api/analysis/chart/requests/days/"+$("#xdays").val()+"?token={{ ANALYSIS_TOKEN }}",
+                            type: "GET",
+                            // If AJAX was successful add the values into the chart
+                            success: function(data) {
+                                var ctx = document.getElementById('xdayschart').getContext('2d');
+                                // Destroy old chart
+                                if(typeof xDayChart !== "undefined") {
+                                    xDayChart.destroy();
+                                }
+                                xDayChart = new Chart(ctx, {
+                                    type: 'line',
+                                    data: {
+                                        labels: data['days'],
+                                        datasets: [{
+                                            label: '# of requests',
+                                            data: data['requests'],
+                                            "fill":false,
+                                            borderColor: 'rgb(178,223,219)',
+                                            backgroundColor: 'rgb(178,223,219)'
+                                        }]
+                                    },
+                                   options: {
+                                        scales: {
+                                            yAxes: [{
+                                                ticks: {
+                                                beginAtZero: true,
+                                                }
+                                            }]
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    $(document).ready(function() {
+                        // Draw chart once after page load
+                        var xDayChart;
+                        drawXDayChart();
+                        // Detect if a change to the dropdown is made
+                        $("#xdays").change(function() {
+                            drawXDayChart();
+                       });
+                   });
+                </script>
+            </div>
+        </div>
+        <!-- end row -->
+
+        <div class="row">
+            <div class="col-xs-12 col-sm-12 col-md-6 col-lg-6 col-xl-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>Most accessed paths</h5>
+                        All time - Top 10
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-responsive-xl table-hover">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Path</th>
+                                    <th scope="col"># of requests</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for elem in data_url_path_top %}
+                                    <tr>
+                                        <td>{{ elem[0] }}</td>
+                                        <td>{{ elem[1] }}</td>
+                                    </tr>
+                                {% endfor %}
+                          </tbody>
+                        </table>
+                    </div>
+                </div><!-- end card-->
+            </div>
+
+            <div class="col-xs-12 col-sm-12 col-md-6 col-lg-6 col-xl-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>IP addresses</h5>
+                            <select id="daysIpAddr" class="form-control inl">
+                                <option value="0">All time</option>
+                                <option value="1">1 day</option>
+                                <option value="7">7 days</option>
+                                <option value="14">14 days</option>
+                                <option value="30">30 days</option>
+                            </select> - Top 10
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-responsive-xl table-hover" id="topIpAddr">
+                            <thead>
+                                <tr>
+                                    <th data-field="remote_addr" scope="col">Remote address</th>
+                                    <th data-field="qty" scope="col"># of requests</th>
+                                </tr>
+                            </thead>
+                        </table>
+                        <script>
+                            function loadTopIPAddresses() {
+                                $.getJSON({
+                                    url: "/api/analysis/table/top-ips/10/days/"+$("#daysIpAddr").val()+"?token={{ ANALYSIS_TOKEN }}",
+                                    type: "GET",
+                                    success: function(data) {
+                                        var event_data = '<tbody>';
+                                        $.each(data, function(index, value){
+                                            event_data += '<tr>';
+                                            event_data += '<td><a href="{{ url_for("analysis_ip", token=ANALYSIS_TOKEN)}}&ip='+value.remote_addr+'">'+value.remote_addr+'</a></td>';
+                                            event_data += '<td>'+value.qty+'</td>';
+                                            event_data += '</tr>';
+                                        });
+                                        event_data = event_data + '</tbody>';
+                                        $("#topIpAddr").append(event_data);
+                                    }
+                                });
+                            }
+                            $(document).ready(function() {
+                                // load table once after page load
+                                loadTopIPAddresses();
+                                // Detect if a change to the dropdown is made: delete old table content and add new
+                                $("#daysIpAddr").change(function() {
+                                    $("#topIpAddr tbody tr").remove();
+                                    loadTopIPAddresses();
+                               });
+                           });
+                        </script>
+                    </div>
+                </div><!-- end card-->
+            </div>
+        </div>
+        <!-- end row -->
+
+    </div>
+    <!-- END container-fluid -->
+{% endblock %}
